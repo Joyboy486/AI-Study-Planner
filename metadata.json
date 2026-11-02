@@ -1,0 +1,8 @@
+{
+  "name": "FocusFlow — AI Study Planner",
+  "description": "Premium futuristic AI productivity dashboard featuring the Cyber Emerald aesthetic, interactive Focus Universe, holographic Pomodoro timer, intelligent revision scheduling, and 3D glassmorphism.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

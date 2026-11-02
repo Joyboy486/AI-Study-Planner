@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-primary: #050807;
+    --bg-secondary: #0A100E;
+    --bg-card: #0D1713;
+    --surface-elevated: #12221A;
+    --emerald-primary: #00D68F;
+    --mint-neon: #64FFCA;
+    --emerald-deep: #008F62;
+    --text-silver: #DCE7E2;
+    --text-primary: #F3FFF9;
+    --text-secondary: #91A69B;
+    --border-emerald: rgba(100, 255, 202, 0.16);
+    --glow-emerald: rgba(0, 214, 143, 0.25);
+    --warning: #FFC857;
+    --error: #FF647C;
+  }
+
+  html, body, #root {
+    height: 100% !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+  }
+
+  body {
+    background-color: #050807;
+    color: #F3FFF9;
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Custom Cyber Emerald scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #050807;
+}
+::-webkit-scrollbar-thumb {
+  background: #12221A;
+  border-radius: 9999px;
+  border: 1px solid rgba(100, 255, 202, 0.12);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #008F62;
+}
+
+/* Cyber Emerald glassmorphism */
+.cyber-glass {
+  background: rgba(13, 23, 19, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(100, 255, 202, 0.16);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.7), inset 0 1px 1px rgba(100, 255, 202, 0.08);
+}
+
+.cyber-glass-elevated {
+  background: rgba(18, 34, 26, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(100, 255, 202, 0.22);
+  box-shadow: 0 16px 40px -12px rgba(0, 0, 0, 0.85), inset 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+
+.cyber-glass-hover {
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cyber-glass-hover:hover {
+  border-color: rgba(100, 255, 202, 0.4);
+  box-shadow: 0 16px 40px -10px rgba(0, 214, 143, 0.25), inset 0 1px 1px rgba(100, 255, 202, 0.2);
+}
+
+/* 3D Perspective Context */
+.perspective-container {
+  perspective: 1200px;
+  transform-style: preserve-3d;
+}
+
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+
+/* Light sweep shimmer for Cyber Emerald primary buttons */
+@keyframes emerald-shimmer {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  50%, 100% { transform: translateX(250%) skewX(-20deg); }
+}
+
+.animate-shimmer {
+  animation: emerald-shimmer 3.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Gentle floating animation */
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+}
+
+.animate-float {
+  animation: float-gentle 4s ease-in-out infinite;
+}
+
+/* Subtle emerald breathing glow */
+@keyframes emerald-glow-pulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.95; }
+}
+
+.animate-emerald-glow {
+  animation: emerald-glow-pulse 3s ease-in-out infinite;
+}
