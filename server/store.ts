@@ -1,5 +1,10 @@
 import type { IUser, ISubject, ITask, IStudySession } from './models/types.ts';
-import { UserModel, SubjectModel, TaskModel, StudySessionModel } from './models/mongooseModels.ts';
+import {
+  UserModel,
+  SubjectModel,
+  TaskModel,
+  StudySessionModel,
+} from './models/mongooseModels.ts';
 import { getDBStatus } from './db.ts';
 
 // In-memory fallback stores
@@ -8,8 +13,17 @@ const memorySubjects = new Map<string, ISubject>();
 const memoryTasks = new Map<string, ITask>();
 const memorySessions = new Map<string, IStudySession>();
 
-// Initialize demo data for instant out-of-the-box delight
 export const DEMO_USER_ID = 'user-demo-101';
+
+// Demo data stays in memory.
+// Registered users use MongoDB.
+function shouldUseMemoryStore(userId?: string): boolean {
+  return !getDBStatus().isConnected || userId === DEMO_USER_ID;
+}
+
+function isMongoObjectId(value: string): boolean {
+  return /^[0-9a-fA-F]{24}$/.test(value);
+}
 
 export function seedDemoData() {
   if (memoryUsers.has(DEMO_USER_ID)) return;
@@ -36,6 +50,7 @@ export function seedDemoData() {
     },
     createdAt: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString(),
   };
+
   memoryUsers.set(DEMO_USER_ID, demoUser);
 
   const subjects: ISubject[] = [
@@ -44,7 +59,7 @@ export function seedDemoData() {
       userId: DEMO_USER_ID,
       name: 'Machine Learning & Neural Nets',
       description: 'Backpropagation, transformers, attention mechanisms, loss optimization.',
-      color: '#00D68F', // primary emerald
+      color: '#00D68F',
       priority: 'high',
       weeklyTarget: 8,
       examDate: new Date(now.getTime() + 12 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -56,7 +71,7 @@ export function seedDemoData() {
       userId: DEMO_USER_ID,
       name: 'Distributed Systems & Consensus',
       description: 'Raft consensus, vector clocks, Paxos, distributed transaction isolation.',
-      color: '#64FFCA', // neon mint
+      color: '#64FFCA',
       priority: 'high',
       weeklyTarget: 6,
       examDate: new Date(now.getTime() + 20 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -68,7 +83,7 @@ export function seedDemoData() {
       userId: DEMO_USER_ID,
       name: 'Advanced Linear Algebra',
       description: 'Eigen decomposition, SVD, Hilbert spaces, spectral graph theory.',
-      color: '#008F62', // deep emerald
+      color: '#008F62',
       priority: 'medium',
       weeklyTarget: 5,
       examDate: new Date(now.getTime() + 28 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -80,7 +95,7 @@ export function seedDemoData() {
       userId: DEMO_USER_ID,
       name: 'Computational Neuroscience',
       description: 'Hodgkin-Huxley model, spiking neural circuits, synaptic plasticity.',
-      color: '#57F5C4', // seafoam mint
+      color: '#57F5C4',
       priority: 'medium',
       weeklyTarget: 5,
       examDate: new Date(now.getTime() + 35 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
@@ -89,8 +104,8 @@ export function seedDemoData() {
     },
   ];
 
-  for (const s of subjects) {
-    memorySubjects.set(s.id, s);
+  for (const subject of subjects) {
+    memorySubjects.set(subject.id, subject);
   }
 
   const tasks: ITask[] = [
@@ -157,85 +172,102 @@ export function seedDemoData() {
     },
   ];
 
-  for (const t of tasks) {
-    memoryTasks.set(t.id, t);
+  for (const task of tasks) {
+    memoryTasks.set(task.id, task);
   }
 
-  // Pre-seed past 6 days of completed study sessions for rich charts & streak
+  // Seed past study sessions
   for (let i = 6; i >= 0; i--) {
     const sessionDay = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-    const sub = subjects[i % subjects.length];
+    const subject = subjects[i % subjects.length];
     const duration = [50, 75, 60, 90, 80, 50, 65][i % 7];
-    
-    const sessId = `sess-${i}`;
+
+    const sessionId = `sess-${i}`;
     const start = new Date(sessionDay.setHours(10, 0, 0, 0)).toISOString();
     const end = new Date(sessionDay.setHours(10, duration, 0, 0)).toISOString();
 
-    memorySessions.set(sessId, {
-      id: sessId,
+    memorySessions.set(sessionId, {
+      id: sessionId,
       userId: DEMO_USER_ID,
-      subjectId: sub.id,
+      subjectId: subject.id,
       startTime: start,
       endTime: end,
       duration,
       sessionType: 'focus',
       completionStatus: 'completed',
-      notes: `Deep focus sprint on ${sub.name}.`,
+      notes: `Deep focus sprint on ${subject.name}.`,
       createdAt: start,
     });
   }
 }
 
-// Initialize seed data at startup
+// Initialize demo data
 seedDemoData();
 
 export const dataStore = {
   // USERS
   async findUserByEmail(email: string): Promise<IUser | null> {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const memoryUser = Array.from(memoryUsers.values()).find(
+      user => user.email.toLowerCase() === normalizedEmail,
+    );
+
+    if (memoryUser) return memoryUser;
+
     const { isConnected } = getDBStatus();
+
     if (isConnected) {
-      const doc = await UserModel.findOne({ email: email.toLowerCase() });
+      const doc = await UserModel.findOne({ email: normalizedEmail });
       if (!doc) return null;
+
       return {
         id: doc._id.toString(),
         name: doc.name,
         email: doc.email,
         passwordHash: doc.passwordHash,
-        preferences: doc.preferences?.toObject ? doc.preferences.toObject() : doc.preferences,
+        preferences: doc.preferences?.toObject
+          ? doc.preferences.toObject()
+          : doc.preferences,
         createdAt: doc.createdAt.toISOString(),
       };
     }
-    const user = Array.from(memoryUsers.values()).find(u => u.email.toLowerCase() === email.toLowerCase());
-    return user || null;
+
+    return null;
   },
 
   async findUserById(id: string): Promise<IUser | null> {
     const { isConnected } = getDBStatus();
-    if (isConnected) {
+
+    if (isConnected && isMongoObjectId(id)) {
       const doc = await UserModel.findById(id);
       if (!doc) return null;
+
       return {
         id: doc._id.toString(),
         name: doc.name,
         email: doc.email,
         passwordHash: doc.passwordHash,
-        preferences: doc.preferences?.toObject ? doc.preferences.toObject() : doc.preferences,
+        preferences: doc.preferences?.toObject
+          ? doc.preferences.toObject()
+          : doc.preferences,
         createdAt: doc.createdAt.toISOString(),
       };
     }
+
     return memoryUsers.get(id) || null;
   },
-
-  async createUser(data: Omit<IUser, 'id' | 'createdAt'>): Promise<IUser> {
-    const { isConnected } = getDBStatus();
+    async createUser(data: Omit<IUser, 'id' | 'createdAt'>): Promise<IUser> {
     const createdAt = new Date().toISOString();
-    if (isConnected) {
+
+    if (getDBStatus().isConnected) {
       const doc = await UserModel.create({
         name: data.name,
         email: data.email.toLowerCase(),
         passwordHash: data.passwordHash,
         preferences: data.preferences,
       });
+
       return {
         id: doc._id.toString(),
         name: doc.name,
@@ -245,63 +277,78 @@ export const dataStore = {
         createdAt: doc.createdAt.toISOString(),
       };
     }
+
     const id = `user-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const user: IUser = { id, ...data, createdAt };
     memoryUsers.set(id, user);
     return user;
   },
 
-  async updateUserPreferences(userId: string, prefs: Partial<IUser['preferences']>): Promise<IUser | null> {
-    const { isConnected } = getDBStatus();
-    if (isConnected) {
-      const doc = await UserModel.findById(userId);
-      if (!doc) return null;
-      doc.preferences = { ...doc.preferences, ...prefs };
-      await doc.save();
-      return {
-        id: doc._id.toString(),
-        name: doc.name,
-        email: doc.email,
-        passwordHash: doc.passwordHash,
-        preferences: doc.preferences,
-        createdAt: doc.createdAt.toISOString(),
-      };
+  async updateUserPreferences(
+    userId: string,
+    prefs: Partial<IUser['preferences']>
+  ): Promise<IUser | null> {
+    if (shouldUseMemoryStore(userId)) {
+      const user = memoryUsers.get(userId);
+      if (!user) return null;
+
+      user.preferences = { ...user.preferences, ...prefs };
+      memoryUsers.set(userId, user);
+      return user;
     }
-    const user = memoryUsers.get(userId);
-    if (!user) return null;
-    user.preferences = { ...user.preferences, ...prefs };
-    memoryUsers.set(userId, user);
-    return user;
+
+    if (!isMongoObjectId(userId)) return null;
+
+    const doc = await UserModel.findById(userId);
+    if (!doc) return null;
+
+    doc.preferences = { ...doc.preferences, ...prefs };
+    await doc.save();
+
+    return {
+      id: doc._id.toString(),
+      name: doc.name,
+      email: doc.email,
+      passwordHash: doc.passwordHash,
+      preferences: doc.preferences,
+      createdAt: doc.createdAt.toISOString(),
+    };
   },
 
   // SUBJECTS
   async getSubjects(userId: string): Promise<ISubject[]> {
-    const { isConnected } = getDBStatus();
-    if (isConnected) {
-      const docs = await SubjectModel.find({ userId }).sort({ createdAt: 1 });
-      return docs.map(d => ({
-        id: d._id.toString(),
-        userId: d.userId,
-        name: d.name,
-        description: d.description,
-        color: d.color,
-        priority: d.priority,
-        weeklyTarget: d.weeklyTarget,
-        examDate: d.examDate,
-        completedHours: d.completedHours,
-        createdAt: d.createdAt.toISOString(),
-      }));
+    if (shouldUseMemoryStore(userId)) {
+      return Array.from(memorySubjects.values()).filter(
+        subject => subject.userId === userId
+      );
     }
-    return Array.from(memorySubjects.values()).filter(s => s.userId === userId);
+
+    const docs = await SubjectModel.find({ userId }).sort({ createdAt: 1 });
+
+    return docs.map(doc => ({
+      id: doc._id.toString(),
+      userId: doc.userId,
+      name: doc.name,
+      description: doc.description,
+      color: doc.color,
+      priority: doc.priority,
+      weeklyTarget: doc.weeklyTarget,
+      examDate: doc.examDate,
+      completedHours: doc.completedHours,
+      createdAt: doc.createdAt.toISOString(),
+    }));
   },
 
-  async createSubject(userId: string, data: Partial<ISubject>): Promise<ISubject> {
-    const { isConnected } = getDBStatus();
+  async createSubject(
+    userId: string,
+    data: Partial<ISubject>
+  ): Promise<ISubject> {
     const createdAt = new Date().toISOString();
-    if (isConnected) {
+
+    if (!shouldUseMemoryStore(userId)) {
       const doc = await SubjectModel.create({
         userId,
-        name: data.name,
+        name: data.name || 'New Subject',
         description: data.description || '',
         color: data.color || '#A78BFA',
         priority: data.priority || 'medium',
@@ -309,6 +356,7 @@ export const dataStore = {
         examDate: data.examDate,
         completedHours: 0,
       });
+
       return {
         id: doc._id.toString(),
         userId: doc.userId,
@@ -322,7 +370,9 @@ export const dataStore = {
         createdAt: doc.createdAt.toISOString(),
       };
     }
+
     const id = `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
     const subject: ISubject = {
       id,
       userId,
@@ -335,90 +385,116 @@ export const dataStore = {
       completedHours: 0,
       createdAt,
     };
+
     memorySubjects.set(id, subject);
     return subject;
   },
 
-  async updateSubject(userId: string, id: string, data: Partial<ISubject>): Promise<ISubject | null> {
-    const { isConnected } = getDBStatus();
-    if (isConnected) {
-      const doc = await SubjectModel.findOneAndUpdate({ _id: id, userId }, data, { new: true });
-      if (!doc) return null;
-      return {
-        id: doc._id.toString(),
-        userId: doc.userId,
-        name: doc.name,
-        description: doc.description,
-        color: doc.color,
-        priority: doc.priority,
-        weeklyTarget: doc.weeklyTarget,
-        examDate: doc.examDate,
-        completedHours: doc.completedHours,
-        createdAt: doc.createdAt.toISOString(),
-      };
+  async updateSubject(
+    userId: string,
+    id: string,
+    data: Partial<ISubject>
+  ): Promise<ISubject | null> {
+    if (shouldUseMemoryStore(userId)) {
+      const subject = memorySubjects.get(id);
+      if (!subject || subject.userId !== userId) return null;
+
+      const updated = { ...subject, ...data };
+      memorySubjects.set(id, updated);
+      return updated;
     }
-    const sub = memorySubjects.get(id);
-    if (!sub || sub.userId !== userId) return null;
-    const updated = { ...sub, ...data };
-    memorySubjects.set(id, updated);
-    return updated;
+
+    if (!isMongoObjectId(id)) return null;
+
+    const doc = await SubjectModel.findOneAndUpdate(
+      { _id: id, userId },
+      data,
+      { new: true }
+    );
+
+    if (!doc) return null;
+
+    return {
+      id: doc._id.toString(),
+      userId: doc.userId,
+      name: doc.name,
+      description: doc.description,
+      color: doc.color,
+      priority: doc.priority,
+      weeklyTarget: doc.weeklyTarget,
+      examDate: doc.examDate,
+      completedHours: doc.completedHours,
+      createdAt: doc.createdAt.toISOString(),
+    };
   },
 
   async deleteSubject(userId: string, id: string): Promise<boolean> {
-    const { isConnected } = getDBStatus();
-    if (isConnected) {
-      const res = await SubjectModel.deleteOne({ _id: id, userId });
-      await TaskModel.deleteMany({ subjectId: id, userId });
-      return res.deletedCount > 0;
-    }
-    const sub = memorySubjects.get(id);
-    if (!sub || sub.userId !== userId) return false;
-    memorySubjects.delete(id);
-    // clean up tasks for this subject
-    for (const [tId, t] of memoryTasks.entries()) {
-      if (t.subjectId === id && t.userId === userId) {
-        memoryTasks.delete(tId);
+    if (shouldUseMemoryStore(userId)) {
+      const subject = memorySubjects.get(id);
+      if (!subject || subject.userId !== userId) return false;
+
+      memorySubjects.delete(id);
+
+      for (const [taskId, task] of memoryTasks.entries()) {
+        if (task.subjectId === id && task.userId === userId) {
+          memoryTasks.delete(taskId);
+        }
       }
+
+      return true;
     }
-    return true;
+
+    if (!isMongoObjectId(id)) return false;
+
+    const result = await SubjectModel.deleteOne({ _id: id, userId });
+    await TaskModel.deleteMany({ subjectId: id, userId });
+
+    return result.deletedCount > 0;
   },
 
   // TASKS
   async getTasks(userId: string): Promise<ITask[]> {
-    const { isConnected } = getDBStatus();
-    if (isConnected) {
-      const docs = await TaskModel.find({ userId }).sort({ dueDate: 1 });
-      return docs.map(d => ({
-        id: d._id.toString(),
-        userId: d.userId,
-        subjectId: d.subjectId,
-        title: d.title,
-        description: d.description,
-        priority: d.priority,
-        dueDate: d.dueDate,
-        estimatedDuration: d.estimatedDuration,
-        status: d.status,
-        completedAt: d.completedAt,
-        createdAt: d.createdAt.toISOString(),
-      }));
+    if (shouldUseMemoryStore(userId)) {
+      return Array.from(memoryTasks.values()).filter(
+        task => task.userId === userId
+      );
     }
-    return Array.from(memoryTasks.values()).filter(t => t.userId === userId);
+
+    const docs = await TaskModel.find({ userId }).sort({ dueDate: 1 });
+
+    return docs.map(doc => ({
+      id: doc._id.toString(),
+      userId: doc.userId,
+      subjectId: doc.subjectId,
+      title: doc.title,
+      description: doc.description,
+      priority: doc.priority,
+      dueDate: doc.dueDate,
+      estimatedDuration: doc.estimatedDuration,
+      status: doc.status,
+      completedAt: doc.completedAt,
+      createdAt: doc.createdAt.toISOString(),
+    }));
   },
 
-  async createTask(userId: string, data: Partial<ITask>): Promise<ITask> {
-    const { isConnected } = getDBStatus();
+  async createTask(
+    userId: string,
+    data: Partial<ITask>
+  ): Promise<ITask> {
     const createdAt = new Date().toISOString();
-    if (isConnected) {
+
+    if (!shouldUseMemoryStore(userId)) {
       const doc = await TaskModel.create({
         userId,
         subjectId: data.subjectId,
-        title: data.title,
+        title: data.title || 'Untitled Task',
         description: data.description || '',
         priority: data.priority || 'medium',
         dueDate: data.dueDate || new Date().toISOString().split('T')[0],
         estimatedDuration: Number(data.estimatedDuration) || 30,
         status: data.status || 'pending',
       });
+
       return {
         id: doc._id.toString(),
         userId: doc.userId,
@@ -432,7 +508,9 @@ export const dataStore = {
         createdAt: doc.createdAt.toISOString(),
       };
     }
+
     const id = `task-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
+
     const task: ITask = {
       id,
       userId,
@@ -445,139 +523,190 @@ export const dataStore = {
       status: data.status || 'pending',
       createdAt,
     };
+
     memoryTasks.set(id, task);
     return task;
   },
 
-  async updateTask(userId: string, id: string, data: Partial<ITask>): Promise<ITask | null> {
-    const { isConnected } = getDBStatus();
-    if (isConnected) {
-      const doc = await TaskModel.findOneAndUpdate({ _id: id, userId }, data, { new: true });
-      if (!doc) return null;
-      return {
-        id: doc._id.toString(),
-        userId: doc.userId,
-        subjectId: doc.subjectId,
-        title: doc.title,
-        description: doc.description,
-        priority: doc.priority,
-        dueDate: doc.dueDate,
-        estimatedDuration: doc.estimatedDuration,
-        status: doc.status,
-        completedAt: doc.completedAt,
-        createdAt: doc.createdAt.toISOString(),
-      };
+  async updateTask(
+    userId: string,
+    id: string,
+    data: Partial<ITask>
+  ): Promise<ITask | null> {
+    if (shouldUseMemoryStore(userId)) {
+      const task = memoryTasks.get(id);
+      if (!task || task.userId !== userId) return null;
+
+      const updated = { ...task, ...data };
+
+      if (data.status === 'completed' && !updated.completedAt) {
+        updated.completedAt = new Date().toISOString();
+      }
+
+      memoryTasks.set(id, updated);
+      return updated;
     }
-    const task = memoryTasks.get(id);
-    if (!task || task.userId !== userId) return null;
-    const updated = { ...task, ...data };
-    if (data.status === 'completed' && !updated.completedAt) {
-      updated.completedAt = new Date().toISOString();
-    }
-    memoryTasks.set(id, updated);
-    return updated;
+
+    if (!isMongoObjectId(id)) return null;
+
+    const doc = await TaskModel.findOneAndUpdate(
+      { _id: id, userId },
+      data,
+      { new: true }
+    );
+
+    if (!doc) return null;
+
+    return {
+      id: doc._id.toString(),
+      userId: doc.userId,
+      subjectId: doc.subjectId,
+      title: doc.title,
+      description: doc.description,
+      priority: doc.priority,
+      dueDate: doc.dueDate,
+      estimatedDuration: doc.estimatedDuration,
+      status: doc.status,
+      completedAt: doc.completedAt,
+      createdAt: doc.createdAt.toISOString(),
+    };
   },
 
   async deleteTask(userId: string, id: string): Promise<boolean> {
-    const { isConnected } = getDBStatus();
-    if (isConnected) {
-      const res = await TaskModel.deleteOne({ _id: id, userId });
-      return res.deletedCount > 0;
-    }
-    const task = memoryTasks.get(id);
-    if (!task || task.userId !== userId) return false;
-    memoryTasks.delete(id);
-    return true;
-  },
+    if (shouldUseMemoryStore(userId)) {
+      const task = memoryTasks.get(id);
+      if (!task || task.userId !== userId) return false;
 
-  // STUDY SESSIONS
+      memoryTasks.delete(id);
+      return true;
+    }
+
+    if (!isMongoObjectId(id)) return false;
+
+    const result = await TaskModel.deleteOne({ _id: id, userId });
+    return result.deletedCount > 0;
+  },
+    // STUDY SESSIONS
   async getSessions(userId: string): Promise<IStudySession[]> {
-    const { isConnected } = getDBStatus();
-    if (isConnected) {
-      const docs = await StudySessionModel.find({ userId }).sort({ startTime: -1 });
-      return docs.map(d => ({
-        id: d._id.toString(),
-        userId: d.userId,
-        subjectId: d.subjectId,
-        taskId: d.taskId,
-        startTime: d.startTime,
-        endTime: d.endTime,
-        duration: d.duration,
-        sessionType: d.sessionType,
-        completionStatus: d.completionStatus,
-        notes: d.notes,
-        createdAt: d.createdAt.toISOString(),
-      }));
+    if (shouldUseMemoryStore(userId)) {
+      return Array.from(memorySessions.values())
+        .filter(session => session.userId === userId)
+        .sort(
+          (a, b) =>
+            new Date(b.startTime).getTime() -
+            new Date(a.startTime).getTime()
+        );
     }
-    return Array.from(memorySessions.values())
-      .filter(s => s.userId === userId)
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+
+    const docs = await StudySessionModel.find({ userId }).sort({
+      startTime: -1,
+    });
+
+    return docs.map(doc => ({
+      id: doc._id.toString(),
+      userId: doc.userId,
+      subjectId: doc.subjectId,
+      taskId: doc.taskId,
+      startTime: doc.startTime,
+      endTime: doc.endTime,
+      duration: doc.duration,
+      sessionType: doc.sessionType,
+      completionStatus: doc.completionStatus,
+      notes: doc.notes,
+      createdAt: doc.createdAt.toISOString(),
+    }));
   },
 
-  async createSession(userId: string, data: Partial<IStudySession>): Promise<IStudySession> {
-    const { isConnected } = getDBStatus();
+  async createSession(
+    userId: string,
+    data: Partial<IStudySession>
+  ): Promise<IStudySession> {
     const createdAt = new Date().toISOString();
-    const duration = Math.max(1, Math.round(Number(data.duration) || 25));
-    
-    // Add completed hours to subject
-    if (data.subjectId && duration > 0 && data.completionStatus === 'completed') {
-      const additionalHours = Number((duration / 60).toFixed(2));
-      if (isConnected) {
-        await SubjectModel.updateOne(
-          { _id: data.subjectId, userId },
-          { $inc: { completedHours: additionalHours } }
-        );
-      } else {
-        const sub = memorySubjects.get(data.subjectId);
-        if (sub && sub.userId === userId) {
-          sub.completedHours = Number(((sub.completedHours || 0) + additionalHours).toFixed(2));
-          memorySubjects.set(data.subjectId, sub);
+    const duration = Math.max(
+      1,
+      Math.round(Number(data.duration) || 25)
+    );
+
+    const startTime =
+      data.startTime ||
+      new Date(Date.now() - duration * 60000).toISOString();
+
+    const endTime = data.endTime || new Date().toISOString();
+
+    if (shouldUseMemoryStore(userId)) {
+      if (data.subjectId && data.completionStatus === 'completed') {
+        const subject = memorySubjects.get(data.subjectId);
+
+        if (subject && subject.userId === userId) {
+          const additionalHours = Number((duration / 60).toFixed(2));
+
+          subject.completedHours = Number(
+            ((subject.completedHours || 0) + additionalHours).toFixed(2)
+          );
+
+          memorySubjects.set(data.subjectId, subject);
         }
       }
-    }
 
-    if (isConnected) {
-      const doc = await StudySessionModel.create({
+      const id = `sess-${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 6)}`;
+
+      const session: IStudySession = {
+        id,
         userId,
-        subjectId: data.subjectId,
+        subjectId: data.subjectId || '',
         taskId: data.taskId,
-        startTime: data.startTime || new Date(Date.now() - duration * 60000).toISOString(),
-        endTime: data.endTime || new Date().toISOString(),
+        startTime,
+        endTime,
         duration,
         sessionType: data.sessionType || 'focus',
         completionStatus: data.completionStatus || 'completed',
         notes: data.notes || '',
-      });
-      return {
-        id: doc._id.toString(),
-        userId: doc.userId,
-        subjectId: doc.subjectId,
-        taskId: doc.taskId,
-        startTime: doc.startTime,
-        endTime: doc.endTime,
-        duration: doc.duration,
-        sessionType: doc.sessionType,
-        completionStatus: doc.completionStatus,
-        notes: doc.notes,
-        createdAt: doc.createdAt.toISOString(),
+        createdAt,
       };
+
+      memorySessions.set(id, session);
+      return session;
     }
 
-    const id = `sess-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-    const session: IStudySession = {
-      id,
+    if (
+      data.subjectId &&
+      data.completionStatus === 'completed' &&
+      isMongoObjectId(data.subjectId)
+    ) {
+      const additionalHours = Number((duration / 60).toFixed(2));
+
+      await SubjectModel.updateOne(
+        { _id: data.subjectId, userId },
+        { $inc: { completedHours: additionalHours } }
+      );
+    }
+
+    const doc = await StudySessionModel.create({
       userId,
-      subjectId: data.subjectId || '',
+      subjectId: data.subjectId,
       taskId: data.taskId,
-      startTime: data.startTime || new Date(Date.now() - duration * 60000).toISOString(),
-      endTime: data.endTime || new Date().toISOString(),
+      startTime,
+      endTime,
       duration,
       sessionType: data.sessionType || 'focus',
       completionStatus: data.completionStatus || 'completed',
       notes: data.notes || '',
-      createdAt,
+    });
+
+    return {
+      id: doc._id.toString(),
+      userId: doc.userId,
+      subjectId: doc.subjectId,
+      taskId: doc.taskId,
+      startTime: doc.startTime,
+      endTime: doc.endTime,
+      duration: doc.duration,
+      sessionType: doc.sessionType,
+      completionStatus: doc.completionStatus,
+      notes: doc.notes,
+      createdAt: doc.createdAt.toISOString(),
     };
-    memorySessions.set(id, session);
-    return session;
   },
 };

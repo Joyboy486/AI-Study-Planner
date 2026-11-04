@@ -14,12 +14,13 @@ export async function connectDB(): Promise<boolean> {
   try {
     mongoose.set('strictQuery', false);
     await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 1500,
-      connectTimeoutMS: 1500,
+      serverSelectionTimeoutMS: 15000,
+      connectTimeoutMS: 15000,
     });
     isConnected = true;
     dbError = null;
-    console.log(`[FocusFlow DB] Successfully connected to MongoDB at ${uri}`);
+    
+    console.log('[FocusFlow DB] Successfully connected to MongoDB');
     return true;
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);

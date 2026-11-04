@@ -9,8 +9,10 @@ import taskRoutes from './server/routes/tasks.ts';
 import sessionRoutes from './server/routes/sessions.ts';
 import analyticsRoutes from './server/routes/analytics.ts';
 import aiRoutes from './server/routes/ai.ts';
+import { setServers } from 'node:dns';
 
 dotenv.config();
+setServers(['8.8.8.8', '1.1.1.1']);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
